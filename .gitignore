@@ -30,3 +30,8 @@ profiles/*
 # 记忆库二进制（含 embedding 向量，几 MB，重新运行 life.py 会自动生成）
 data/*.db
 profiles/**/*.db
+
+# 视频素材与成片（体积大，不入库；构建脚本在 docs/video-build/）
+docs/video-assets/
+docs/video-build/
+docs/virtual-life-intro.mp4
