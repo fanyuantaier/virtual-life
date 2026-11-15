@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>沈青蔓 · 人生时间轴</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "PingFang SC","Microsoft YaHei",sans-serif;
+         background: linear-gradient(160deg,#f5f1e8,#e8e2d5); min-height: 100vh; }
+  header { background: rgba(255,255,255,.75); padding: 16px 24px;
+           border-bottom: 1px solid #d8d0bf; display:flex; align-items:center; gap:12px; }
+  header a { color:#7ba05b; text-decoration:none; font-size:14px; margin-left:auto; }
+  header h1 { font-size:18px; color:#3d3a32; }
+  #age-nav { padding: 10px 24px; display:flex; gap:6px; flex-wrap:wrap;
+             background:rgba(255,255,255,.5); border-bottom:1px solid #e0d9c8; }
+  #age-nav button { border:1px solid #c8c0b0; background:white; padding:4px 12px;
+                    border-radius:14px; cursor:pointer; font-size:13px; color:#555; }
+  #age-nav button.active { background:#7ba05b; color:white; border-color:#7ba05b; }
+  #timeline { max-width: 760px; margin: 24px auto; padding: 0 16px; }
+  .year { margin-bottom: 30px; }
+  .year-title { font-size: 18px; color: #5a7a3d; margin-bottom: 12px;
+                border-left: 4px solid #7ba05b; padding-left: 10px; }
+  .item { background: white; border: 1px solid #e0d9c8; border-radius: 10px;
+          padding: 10px 14px; margin-bottom: 8px; font-size: 14px; line-height: 1.6; }
+  .item .meta { font-size: 12px; color: #999; margin-bottom: 4px; }
+  .item.dream { border-left: 3px solid #9b7ec9; }
+  .item.persona { border-left: 3px solid #d4a34a; background: #fdf9ee; }
+  .item.scene { border-left: 3px solid #6aa3c9; }
+  .item.event { border-left: 3px solid #7ba05b; }
+  .item .kind { font-size: 11px; padding: 1px 8px; border-radius: 8px;
+                background: #f0ecdf; color: #777; margin-right: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>沈青蔓 · 人生时间轴</h1>
+  <a href="/">← 回聊天</a>
+</header>
+<div id="age-nav"></div>
+<div id="timeline">加载中…</div>
+<script>
+let data = [];
+const nav = document.getElementById('age-nav');
+const tl = document.getElementById('timeline');
+const kindName = {event:'经历', dream:'梦', persona:'人格', scene:'场景', fact:'事实', thought:'想法', chat:'对话'};
+
+fetch('/api/timeline').then(r=>r.json()).then(d=>{
+  data = d;
+  renderNav();
+  renderAll();
+});
+
+function renderNav() {
+  nav.innerHTML = '';
+  const all = document.createElement('button');
+  all.textContent = '全部'; all.className = 'active';
+  all.onclick = () => { setActive(all); renderAll(); };
+  nav.appendChild(all);
+  data.forEach(y => {
+    const b = document.createElement('button');
+    b.textContent = y.age + ' 岁';
+    b.onclick = () => { setActive(b); renderYear(y); };
+    nav.appendChild(b);
+  });
+}
+
+function setActive(btn) {
+  nav.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function renderAll() {
+  tl.innerHTML = '';
+  data.forEach(y => tl.appendChild(renderYearBlock(y)));
+}
+
+function renderYear(y) {
+  tl.innerHTML = '';
+  tl.appendChild(renderYearBlock(y));
+}
+
+function renderYearBlock(y) {
+  const div = document.createElement('div');
+  div.className = 'year';
+  const t = document.createElement('div');
+  t.className = 'year-title';
+  t.textContent = y.age + ' 岁 · ' + y.items.length + ' 条记忆';
+  div.appendChild(t);
+  y.items.forEach(it => {
+    const item = document.createElement('div');
+    item.className = 'item ' + it.kind;
+    const kindLabel = kindName[it.kind] || it.kind;
+    item.innerHTML = `<div class="meta"><span class="kind">${kindLabel}</span>${it.when}</div>${escapeHtml(it.text)}`;
+    div.appendChild(item);
+  });
+  return div;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>

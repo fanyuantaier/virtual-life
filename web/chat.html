@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>囡囡 · 沈青蔓</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(160deg, #f5f1e8 0%, #e8e2d5 100%);
+    height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    background: rgba(255,255,255,0.75); backdrop-filter: blur(8px);
+    padding: 14px 24px; display: flex; align-items: center; gap: 14px;
+    border-bottom: 1px solid #d8d0bf; flex-shrink: 0;
+  }
+  .avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, #7ba05b 0%, #a3c48c 100%);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 20px; font-weight: bold;
+  }
+  .info h1 { font-size: 17px; color: #3d3a32; }
+  .info p { font-size: 12px; color: #8a8577; }
+  #stats { font-size: 12px; color: #8a8577; margin-left: auto; }
+  #chat { flex: 1; overflow-y: auto; padding: 20px 24px; }
+  .msg { max-width: 70%; margin-bottom: 14px; padding: 10px 16px;
+         border-radius: 14px; line-height: 1.6; font-size: 14px; white-space: pre-wrap; }
+  .user { background: #7ba05b; color: white; margin-left: auto; border-bottom-right-radius: 4px; }
+  .bot  { background: white; color: #3d3a32; border: 1px solid #e0d9c8;
+          border-bottom-left-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+  .typing { color: #999; font-style: italic; }
+  #input-area {
+    padding: 14px 24px; background: rgba(255,255,255,0.75);
+    border-top: 1px solid #d8d0bf; display: flex; gap: 10px; flex-shrink: 0;
+  }
+  #input { flex: 1; padding: 12px 16px; border-radius: 22px; border: 1px solid #c8c0b0;
+           font-size: 14px; outline: none; background: white; }
+  #input:focus { border-color: #7ba05b; }
+  #send { padding: 12px 26px; border-radius: 22px; border: none;
+          background: #7ba05b; color: white; font-size: 14px; cursor: pointer; }
+  #send:hover { background: #6a8f4e; }
+  #send:disabled { background: #b5b5a5; cursor: wait; }
+</style>
+</head>
+<body>
+<header>
+  <div class="avatar">蔓</div>
+  <div class="info">
+    <h1>沈青蔓 <span style="font-weight:normal;font-size:13px">· 囡囡</span></h1>
+    <p>18 岁 · 苏州 · 刚高中毕业</p>
+  </div>
+  <div id="stats">加载中…</div>
+  <a href="/dashboard" style="font-size:13px;color:#8a9a6b;text-decoration:none;margin-left:10px">控制台</a>
+  <a href="/timeline" style="font-size:13px;color:#7ba05b;text-decoration:none;margin-left:10px">时间轴</a>
+  <a href="/moments" style="font-size:13px;color:#7ba05b;text-decoration:none;margin-left:8px">她的朋友圈</a>
+  <button id="godhand-btn" style="font-size:12px;border:1px solid #d4a34a;background:#fdf9ee;color:#a3792a;padding:4px 10px;border-radius:10px;cursor:pointer;margin-left:6px">上帝之手</button>
+</header>
+<div id="chat">
+  <div class="msg bot">嗨，我是囡囡呀。刚毕业在家里待着，你要聊点啥？</div>
+</div>
+<div id="input-area">
+  <input id="input" placeholder="跟她聊点什么…" autocomplete="off">
+  <button id="send">发送</button>
+</div>
+<script>
+const chatBox = document.getElementById('chat');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+let history = [];
+
+fetch('/api/stats').then(r=>r.json()).then(d=>{
+  document.getElementById('stats').textContent =
+    `记忆 ${d.memory_total} 条 · 日记 ${d.diary_days} 天 · 梦 ${d.dreams} 个 · 最近活跃 ${d.last_memory_at}`;
+});
+fetch('/api/intimacy').then(r=>r.json()).then(d=>{
+  const el = document.createElement('div');
+  el.style.cssText = 'font-size:12px;color:#7ba05b;margin-left:8px';
+  el.textContent = `${d.label} · 认识 ${d.days} 天 · 聊了 ${d.rounds} 轮`;
+  document.querySelector('.info').appendChild(el);
+});
+
+function addMsg(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + cls;
+  div.textContent = text;
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  return div;
+}
+
+async function send() {
+  const msg = input.value.trim();
+  if (!msg) return;
+  addMsg(msg, 'user');
+  input.value = '';
+  sendBtn.disabled = true;
+  const typing = addMsg('囡囡在想…', 'bot typing');
+  try {
+    const resp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg, history: history.slice(-10)})
+    });
+    const data = await resp.json();
+    typing.remove();
+    if (data.error) { addMsg('（她好像走神了：' + data.error + '）', 'bot'); }
+    else {
+      addMsg(data.reply, 'bot');
+      history.push({role:'user', content:msg});
+      history.push({role:'assistant', content:data.reply});
+    }
+  } catch (e) {
+    typing.remove();
+    addMsg('（网络出错）', 'bot');
+  }
+  sendBtn.disabled = false;
+  input.focus();
+}
+
+sendBtn.onclick = send;
+
+document.getElementById('godhand-btn').onclick = async () => {
+  const text = prompt('上帝之手：输入一条干预（会编进她明天的生活）');
+  if (!text) return;
+  const resp = await fetch('/api/godhand', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({intervention: text})
+  });
+  if (resp.ok) { addMsg('【干预已下达，明天她的世界里会发生】' + text, 'bot'); }
+  else { addMsg('（干预失败）', 'bot'); }
+};
+input.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+input.focus();
+</script>
+</body>
+</html>

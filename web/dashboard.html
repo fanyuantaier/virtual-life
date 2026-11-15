@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>控制台 · Virtual Life</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:"PingFang SC","Microsoft YaHei",sans-serif;
+         background:linear-gradient(160deg,#1a1d24,#242830); min-height:100vh; color:#d8d4c8; }
+  header { padding:18px 28px; border-bottom:1px solid #333845;
+           display:flex; align-items:center; gap:16px; }
+  header h1 { font-size:18px; color:#e8e4d8; }
+  header a { color:#8a9a6b; text-decoration:none; font-size:13px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr));
+          gap:18px; padding:22px; max-width:1400px; margin:0 auto; }
+  .card { background:#242830; border:1px solid #383e4c; border-radius:12px; padding:18px; }
+  .card h2 { font-size:14px; color:#8a9a6b; margin-bottom:12px; letter-spacing:1px; }
+  .num { font-size:28px; color:#e8e4d8; font-weight:bold; }
+  .label { font-size:12px; color:#777d8a; }
+  .row { display:flex; justify-content:space-between; padding:6px 0;
+         border-bottom:1px solid #2e3340; font-size:13px; }
+  .row:last-child { border-bottom:none; }
+  .btn { padding:8px 18px; border-radius:8px; border:1px solid #4a5a3a;
+         background:#3a4a2e; color:#c8d8a8; cursor:pointer; font-size:13px; margin-right:8px; }
+  .btn:hover { background:#4a5a3a; }
+  .btn.warn { border-color:#5a4a3a; background:#4a3a2e; color:#d8c8a8; }
+  select, input[type=text] { padding:8px 12px; border-radius:8px; border:1px solid #383e4c;
+          background:#1a1d24; color:#d8d4c8; font-size:13px; }
+  #log { font-family:monospace; font-size:12px; color:#8a9a6b; max-height:200px;
+         overflow-y:auto; background:#1a1d24; border-radius:8px; padding:10px; }
+  .status-dot { display:inline-block; width:8px; height:8px; border-radius:50%;
+                margin-right:6px; }
+  .dot-on { background:#7ba05b; } .dot-off { background:#6a4a3a; }
+  a { color:#8a9a6b; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Virtual Life 控制台</h1>
+  <a href="/">← 聊天</a>
+  <a href="/timeline">时间轴</a>
+  <a href="/moments">朋友圈</a>
+</header>
+<div class="grid">
+  <div class="card">
+    <h2>人生状态</h2>
+    <div id="stats">加载中…</div>
+  </div>
+  <div class="card">
+    <h2>引擎进程</h2>
+    <div id="procs">加载中…</div>
+  </div>
+  <div class="card">
+    <h2>训练（harness）</h2>
+    <p style="font-size:12px;color:#777d8a;margin-bottom:10px">
+      档位：normal 日常 / burst 加密 / max 灌满。夜间窗口（23:00-09:00）建议 max。</p>
+    <select id="profile">
+      <option value="normal">normal</option>
+      <option value="burst">burst</option>
+      <option value="max" selected>max</option>
+    </select>
+    <input type="text" id="days" placeholder="精补天数(0)" style="width:80px">
+    <button class="btn" onclick="startHarness()">启动训练</button>
+    <div id="harness-log" style="margin-top:10px;font-size:12px;color:#8a9a6b"></div>
+  </div>
+  <div class="card">
+    <h2>记忆检索</h2>
+    <input type="text" id="memq" placeholder="搜索她的记忆…" style="width:70%">
+    <button class="btn" onclick="searchMem()">搜</button>
+    <div id="memresults" style="margin-top:10px;font-size:13px"></div>
+  </div>
+  <div class="card">
+    <h2>上帝之手</h2>
+    <input type="text" id="godinput" placeholder="干预内容，会编进她明天的生活…" style="width:70%">
+    <button class="btn warn" onclick="godhand()">下达干预</button>
+    <div id="godlist" style="margin-top:10px;font-size:12px;color:#8a9a6b"></div>
+  </div>
+  <div class="card">
+    <h2>模型设置</h2>
+    <div style="margin-bottom:8px">
+      <div class="label">LLM 端点（OpenAI 兼容）</div>
+      <input type="text" id="cfg-url" style="width:95%;margin:4px 0">
+      <div class="label">模型名</div>
+      <input type="text" id="cfg-model" style="width:95%;margin:4px 0">
+      <div class="label">API Key（本地可空）</div>
+      <input type="text" id="cfg-key" style="width:95%;margin:4px 0">
+    </div>
+    <button class="btn" onclick="saveConfig()">保存</button>
+    <span id="cfg-msg" class="label" style="margin-left:10px"></span>
+  </div>
+  <div class="card">
+    <h2>数据管理</h2>
+    <button class="btn" onclick="location.href='/timeline'">人生时间轴</button>
+    <button class="btn" onclick="location.href='/moments'">她的朋友圈</button>
+    <p style="font-size:12px;color:#777d8a;margin-top:10px">
+      数据本地存储。导出/删除走 profiles API。</p>
+  </div>
+</div>
+<script>
+function refresh() {
+  fetch('/api/stats').then(r=>r.json()).then(d=>{
+    document.getElementById('stats').innerHTML =
+      `<div class="num">${d.memory_total}</div><div class="label">记忆节点</div>` +
+      `<div style="margin-top:8px">` +
+      Object.entries(d.memory_kinds).map(([k,v])=>`<span class="label">${k}:${v} </span>`).join('') +
+      `</div><div class="label" style="margin-top:6px">最近活跃 ${d.last_memory_at}</div>`;
+  });
+  fetch('/api/process').then(r=>r.json()).then(d=>{
+    const el = document.getElementById('procs');
+    if (!d.processes.length) { el.innerHTML = '<span class="status-dot dot-off"></span><span class="label">无引擎进程</span>'; return; }
+    el.innerHTML = d.processes.map(p =>
+      `<div class="row"><span><span class="status-dot dot-on"></span>${p.kind}</span><span class="label">PID ${p.pid}</span></div>`).join('');
+  });
+  fetch('/api/godhand/list').then(r=>r.json()).then(d=>{
+    document.getElementById('godlist').textContent =
+      d.length ? `待消化干预 ${d.length} 条` : '无待处理干预';
+  });
+}
+function startHarness() {
+  const profile = document.getElementById('profile').value;
+  const days = document.getElementById('days').value || 0;
+  fetch('/api/harness/run', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({profile, days: Number(days)})})
+    .then(r=>r.json()).then(d=>{
+      document.getElementById('harness-log').textContent = d.message || d.error;
+    });
+}
+function searchMem() {
+  const q = document.getElementById('memq').value;
+  if (!q) return;
+  fetch('/api/memory/search?q='+encodeURIComponent(q)).then(r=>r.json()).then(d=>{
+    document.getElementById('memresults').innerHTML = d.map(x =>
+      `<div class="row"><span>${x.when} [${x.kind}]</span></div><div style="font-size:13px;padding:4px 0">${x.text}</div>`).join('')
+      || '<span class="label">无结果</span>';
+  });
+}
+function loadConfig() {
+  fetch('/api/config').then(r=>r.json()).then(d=>{
+    document.getElementById('cfg-url').value = d.llm_base_url || '';
+    document.getElementById('cfg-model').value = d.llm_model || '';
+    document.getElementById('cfg-key').value = d.api_key || '';
+  });
+}
+function saveConfig() {
+  const body = {
+    llm_base_url: document.getElementById('cfg-url').value,
+    llm_model: document.getElementById('cfg-model').value,
+    api_key: document.getElementById('cfg-key').value,
+  };
+  fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)}).then(r=>r.json()).then(d=>{
+    document.getElementById('cfg-msg').textContent = d.note || '已保存';
+  });
+}
+function godhand() {
+  const t = document.getElementById('godinput').value;
+  if (!t) return;
+  fetch('/api/godhand', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({intervention: t})}).then(()=>refresh());
+  document.getElementById('godinput').value = '';
+}
+refresh();
+loadConfig();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>

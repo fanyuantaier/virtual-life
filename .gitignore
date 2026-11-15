@@ -1,0 +1,32 @@
+# 运行时产物
+logs/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+
+# 本机模型端点配置（各人自己填）
+config_local.json
+
+# 用户与囡囡的私密对话记忆（不公开）
+data/user_memories.json
+data/relation.json
+
+# 运行时状态
+data/checkpoints/
+data/backups/
+data/godhand/
+data/exports/
+data/raw_*.log
+
+# 其他人格实例（nanan 是官方演示人格，保留）
+profiles/*
+!profiles/nanan/
+
+# 记忆库二进制（含 embedding 向量，4MB+，按需自行生成）
+!profiles/*/
+# 记忆库二进制（含 embedding 向量，几 MB，重新运行 life.py 会自动生成）
+data/*.db
+profiles/**/*.db
