@@ -67,9 +67,11 @@ def api_stats():
     diary_days = len(list((config.DATA_DIR / "diary_life" / "adult").glob("*.md")))
     dreams = len(list((config.DATA_DIR / "diary_life" / "dreams").glob("*.md")))
     last_when = datetime.fromtimestamp(last_ts).strftime("%Y-%m-%d %H:%M") if last_ts else "-"
+    # 年龄按重映射锚点（出生 2008-11-04）对真实时钟计算
+    age_years = round((datetime.now().date() - date(2008, 11, 4)).days / 365.25, 1)
     return jsonify({
         "name": "沈青蔓（囡囡）",
-        "age_years": 18.1,
+        "age_years": age_years,
         "memory_total": n,
         "memory_kinds": kinds,
         "diary_days": diary_days,
@@ -90,9 +92,9 @@ def api_timeline():
     from life import LifeSim
     sim = LifeSim(42)
     con = sqlite3.connect(str(sim.db_path))
-    birth = datetime(2010, 11, 4)   # 18 岁 → 出生年 2008+2? 按库算：用 birth_date
+    # 出生锚定 2008-11-04（时间轴重映射后的真实锚点），不用 generate_birth 的 today()
     from datetime import date as _date
-    b = sim.birth_date
+    b = _date(2008, 11, 4)
     rows = con.execute(
         "SELECT text, ts, kind FROM nodes WHERE kind IN ('event','dream','persona','scene') "
         "ORDER BY ts").fetchall()

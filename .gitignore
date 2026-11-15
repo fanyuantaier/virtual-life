@@ -35,3 +35,6 @@ profiles/**/*.db
 docs/video-assets/
 docs/video-build/
 docs/virtual-life-intro.mp4
+
+# 时间轴修正备份库（本地回滚用，不入库）
+data/backups/
