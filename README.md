@@ -1,6 +1,10 @@
 # Virtual Life · 虚拟人生成器
 
 <p align="center">
+  <img src="docs/cover-social.png" width="720" alt="Virtual Life 封面">
+</p>
+
+<p align="center">
   <a href="#中文"><img src="https://img.shields.io/badge/文档-中文-blue" alt="中文"></a>
   <a href="#english"><img src="https://img.shields.io/badge/docs-English-blue" alt="English"></a>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
