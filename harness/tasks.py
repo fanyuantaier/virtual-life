@@ -13,6 +13,14 @@ from datetime import date, datetime, timedelta
 
 import config
 
+# 时间轴重映射后的出生锚点（与 web/server.py、数据一致）
+SIM_BIRTH = date(2008, 11, 4)
+
+
+def age_label(d: date) -> str:
+    """补录事件的年龄标签：按真实锚点算，避免负年龄。"""
+    return f"({(d - SIM_BIRTH).days / 365.25:.1f}岁·补)"
+
 
 def deep_day(sim, d: date, profile) -> int:
     """单日精细补写：完整导演流程（逐日模式），事件密度按档位。"""
@@ -41,13 +49,18 @@ def deep_day(sim, d: date, profile) -> int:
             from memory.forgetting import is_key_memory
             key = is_key_memory(ev.content, ev.intensity, ev.actors,
                                 ev.decision_point, {"妈妈", "爸爸", "外婆"})
-            store.add("event", f"({(d - sim.birth_date).days / 365.25:.1f}岁·补) {ev.content}",
+            store.add("event", f"{age_label(d)} {ev.content}",
                       when=datetime(d.year, d.month, d.day, 12, 0),
                       importance=min(10.0, 2.0 + ev.intensity), key=key)
             count += 1
         return count
-    except Exception:
+    except Exception as exc:
+        print(f"    [deep_day] {d} 导演失败（{str(exc)[:60]}），走兜底")
         plan = fallback_day(d, state, last_events=[n["text"] for n in recent[:1]])
+        for ev in plan.events:
+            store.add("event", f"{age_label(d)} {ev.content}",
+                      when=datetime(d.year, d.month, d.day, 12, 0),
+                      importance=4.0, key=1)
         return len(plan.events)
 
 
@@ -105,7 +118,7 @@ def monthly_redistill(sim, llm_chat, months: int) -> int:
         con.close()
         if not rows:
             continue
-        layers = distill(llm_chat, (today - start).days / 365.25, rows)
+        layers = distill(llm_chat, (end - SIM_BIRTH).days / 365.25, rows)
         for f in layers["L1"]:
             sim.store().add("fact", f, importance=6.0, key=2)
         for domain, desc in layers["L2"].items():
