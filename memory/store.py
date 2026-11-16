@@ -217,13 +217,19 @@ class MemoryStore:
         con.close()
         return top
 
-    def recent(self, days: float = 1.0) -> list[dict]:
-        """取最近 N 天的节点（反思与编年史用）。"""
-        cutoff = time.time() - days * 86400
+    def recent(self, days: float = 1.0, until_ts: float | None = None) -> list[dict]:
+        """取最近 N 天的节点（反思与编年史用）。
+
+        until_ts：过滤的截止时间戳，缺省用真实时钟；年度反思等模拟时间轴场景
+        必须传模拟年末，否则会拿错年份的记忆。传了 until_ts 时同时按上界过滤，
+        把结果限定在 [until_ts - days, until_ts] 窗口内。"""
+        if until_ts is None:
+            until_ts = time.time()
+        cutoff = until_ts - days * 86400
         con = self._con()
         rows = con.execute(
-            "SELECT id,kind,text,ts,importance,poignancy FROM nodes WHERE ts>=? ORDER BY ts",
-            (cutoff,)).fetchall()
+            "SELECT id,kind,text,ts,importance,poignancy FROM nodes WHERE ts>=? AND ts<=? ORDER BY ts",
+            (cutoff, until_ts)).fetchall()
         con.close()
         return [{"id": r[0], "kind": r[1], "text": r[2],
                  "when": datetime.fromtimestamp(r[3]), "importance": r[4],

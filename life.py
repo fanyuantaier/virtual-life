@@ -144,10 +144,27 @@ class LifeSim:
             f.write("\n")
         return True
 
-    def annual_reflection(self, age_years: float) -> str:
-        """年度人格审计：这一年的记忆蒸馏成自我认知（幼年期由 LLM 代述）。"""
+    def _sim_birth_anchor(self, store) -> datetime:
+        """模拟时间轴的出生锚点：库中最早一条事件事件的时间（重映射后即真实锚定日期）。"""
+        import sqlite3
+        con = sqlite3.connect(str(self.db_path))
+        row = con.execute(
+            "SELECT MIN(ts) FROM nodes WHERE kind='event'").fetchone()
+        con.close()
+        if row and row[0]:
+            return datetime.fromtimestamp(row[0])
+        return datetime.combine(self.birth_date, datetime.min.time())
+
+    def annual_reflection(self, age_years: float, with_distill: bool = True) -> str:
+        """年度人格审计：这一年的记忆蒸馏成自我认知（幼年期由 LLM 代述）。
+
+        过滤窗口按模拟时间轴计算（出生锚点 + 岁数 × 365.25 天），不依赖真实时钟——
+        否则重映射后的时间戳会让年度反思拿到错误年份的记忆。"""
         store = self.store()
-        nodes = store.recent(days=365.0)
+        anchor = self._sim_birth_anchor(store)
+        n = max(1, int(age_years))          # 刚满的岁数
+        win_end = anchor + timedelta(days=n * 365.25)
+        nodes = store.recent(days=365.25, until_ts=win_end.timestamp())
         if not nodes:
             return ""
         listing = "\n".join(f"- {n['text']}" for n in nodes[:40])
@@ -167,20 +184,21 @@ class LifeSim:
             store.add("thought", f"【{int(age_years)}岁年度总结】{summary[:300]}",
                       importance=9.0, key=3)
             # 分层蒸馏（借鉴 TencentDB-Agent-Memory：L1 事实→L2 场景→L3 人格画像）
-            try:
-                from memory.distill import distill
-                year_texts = [n["text"] for n in nodes[:60]]
-                layers = distill(llm.chat, age_years, year_texts)
-                for f in layers["L1"]:
-                    store.add("fact", f, importance=7.0, key=2)
-                for domain, desc in layers["L2"].items():
-                    store.add("scene", f"[{domain}] {desc}", importance=8.0, key=3)
-                for trait in layers["L3"]:
-                    store.add("persona", trait, importance=9.0, key=3)
-                log.info("蒸馏完成 L1=%d L2=%d L3=%d",
-                         len(layers["L1"]), len(layers["L2"]), len(layers["L3"]))
-            except Exception as exc:
-                log.warning("分层蒸馏失败（不影响总结）: %s", str(exc)[:80])
+            if with_distill:
+                try:
+                    from memory.distill import distill
+                    year_texts = [n["text"] for n in nodes[:60]]
+                    layers = distill(llm.chat, age_years, year_texts)
+                    for f in layers["L1"]:
+                        store.add("fact", f, importance=7.0, key=2)
+                    for domain, desc in layers["L2"].items():
+                        store.add("scene", f"[{domain}] {desc}", importance=8.0, key=3)
+                    for trait in layers["L3"]:
+                        store.add("persona", trait, importance=9.0, key=3)
+                    log.info("蒸馏完成 L1=%d L2=%d L3=%d",
+                             len(layers["L1"]), len(layers["L2"]), len(layers["L3"]))
+                except Exception as exc:
+                    log.warning("分层蒸馏失败（不影响总结）: %s", str(exc)[:80])
             return summary
         except Exception as exc:
             log.warning("年度反思失败（%s），1 分钟后重试一次", exc)
