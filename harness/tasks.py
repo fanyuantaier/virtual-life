@@ -137,3 +137,48 @@ def weekly_reflection(sim, llm_chat) -> str:
         f"下面是囡囡这一周的经历。找「重复出现的模式」（同一情绪/同一件事反复）和「变化」"
         f"（和之前相比她有什么不一样），写 200 字以内的周度观察，第一人称。\n{listing}",
         "你是囡囡自己的声音。")
+
+
+def normal_day(sim, d: date, profile) -> int:
+    """正常时间线的一天：与 deep_day 同流程，但年龄标签不带『·补』——
+    这是她正在过的日子，不是补录。"""
+    import life as life_mod
+    from world.physics import build_skeleton
+    from world import director as director_mod
+    from contracts import ProtagonistState, NpcState
+    from world.fallback import fallback_day
+    store = sim.store()
+    state = ProtagonistState(energy=75, mood=10, money=2800, location="家")
+    npc_map = {"妈妈": NpcState(name="妈妈", relationship=60),
+               "爸爸": NpcState(name="爸爸", relationship=35),
+               "外婆": NpcState(name="外婆", relationship=65)}
+    skeleton = build_skeleton(d)
+    recent = store.recent(days=30.0)
+    chronicle = chr(10).join(f"[{n['when']:%m-%d}] {n['text']}" for n in recent[-30:])
+    try:
+        llm = director_mod.LLMClient(model=config._think_model(),
+                                     base_url=config.LLM_BASE_URL or life_mod._local_llm_url(),
+                                     timeout=480.0)
+        director = director_mod.Director(llm=llm)
+        plan = director.plan_day(d, skeleton, state, chronicle,
+                                 [], list(npc_map.values()), [], reality_hooks="")
+        count = 0
+        age = (d - SIM_BIRTH).days / 365.25
+        for ev in plan.events:
+            from memory.forgetting import is_key_memory
+            key = is_key_memory(ev.content, ev.intensity, ev.actors,
+                                ev.decision_point, {"妈妈", "爸爸", "外婆"})
+            store.add("event", f"({age:.1f}岁) {ev.content}",
+                      when=datetime(d.year, d.month, d.day, 12, 0),
+                      importance=min(10.0, 2.0 + ev.intensity), key=key)
+            count += 1
+        return count
+    except Exception as exc:
+        print(f"    [normal_day] {d} 导演失败（{str(exc)[:60]}），走兜底", flush=True)
+        plan = fallback_day(d, state, last_events=[n["text"] for n in recent[:1]])
+        age = (d - SIM_BIRTH).days / 365.25
+        for ev in plan.events:
+            store.add("event", f"({age:.1f}岁) {ev.content}",
+                      when=datetime(d.year, d.month, d.day, 12, 0),
+                      importance=4.0, key=1)
+        return len(plan.events)
