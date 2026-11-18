@@ -37,7 +37,7 @@ NEWS_FEEDS = [                    # RSS 源（无 key，可自行增删）
 TIME_SCALE = 1.0                  # 1.0=实时；2.0=一天快 2 倍；仅 daemon.py 用
 DETAIL_LEVEL = "rich"             # sparse / normal / rich（成人逐日模式的事件密度）
 SLOTS = ("morning", "afternoon", "evening", "night")
-EVENTS_PER_SLOT = {"sparse": (0, 1), "normal": (1, 2), "rich": (2, 3)}  # 每槽事件数区间
+EVENTS_PER_SLOT = {"sparse": (0, 1), "normal": (1, 2), "rich": (5, 8)}  # 每槽事件数区间（max 档密度）
 MAJOR_EVENT_MIN_GAP = 7
 MAJOR_EVENT_MAX_GAP = 12
 HOURLY_SLOTS = (
