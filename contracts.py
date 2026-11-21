@@ -79,5 +79,5 @@ class DayPlan(BaseModel):
 class MemoryHit(BaseModel):
     when: datetime
     text: str
-    kind: Literal["event", "thought", "chat", "diary"]
+    kind: Literal["event", "thought", "chat", "diary", "fact", "scene", "persona", "dream", "ticket"]
     importance: float
