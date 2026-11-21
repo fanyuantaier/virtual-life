@@ -230,13 +230,13 @@ def tick() -> None:
         return
     # 一天只调一次导演：当天无 DayPlan 存档则现生成
     plan_file = config.DATA_DIR / "checkpoints" / f"adult_plan_{date.today().isoformat()}.json"
+    reality = {"weather": ctx.reality.get_weather(config.CITY),
+               "headlines": ctx.reality.get_headlines(3), "inbox": []}
     from contracts import DayPlan
     if plan_file.exists():
         day_plan = DayPlan.model_validate_json(plan_file.read_text(encoding="utf-8"))
         log.info("adult: 复用当日计划（%d 事件）", len(day_plan.events))
     else:
-        reality = {"weather": ctx.reality.get_weather(config.CITY),
-                   "headlines": ctx.reality.get_headlines(3), "inbox": []}
         try:
             day_plan = ctx.director.make_day_plan(date.today(), {"reality": reality})
         except RuntimeError as exc:
