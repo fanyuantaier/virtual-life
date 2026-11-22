@@ -25,15 +25,23 @@ def glm_remaining():
 
 
 def burnout_alive() -> int:
-    """数还活着的 burnout 进程。"""
-    r = subprocess.run(["powershell", "-NoProfile", "-Command",
-        "(Get-CimInstance Win32_Process -Filter \"Name like 'python%'\" | "
-        "Where-Object {$_.CommandLine -like '*burnout*'}).Count"],
-        capture_output=True, text=True)
+    """数还活着的 burnout 进程（用 psutil 替代 PowerShell 转义丢失的 $_ 变量）。"""
     try:
-        return int(r.stdout.strip() or 0)
-    except ValueError:
-        return 0
+        import psutil
+        n = 0
+        for proc in psutil.process_iter(["cmdline"]):
+            try:
+                cmd = " ".join(proc.info["cmdline"] or [])
+                if "burnout" in cmd and "python" in cmd.lower():
+                    n += 1
+            except Exception:
+                continue
+        return n
+    except ImportError:
+        # psutil 缺席时退化为任务列表匹配
+        r = subprocess.run(["tasklist", "/FI", "IMAGENAME eq python.exe"],
+                           capture_output=True, text=True)
+        return r.stdout.count("python.exe")
 
 
 def backup_db() -> str:
@@ -57,7 +65,12 @@ def main() -> None:
         now = datetime.now().strftime("%H:%M:%S")
         if rem is not None:
             print(f"[{now}] GLM={rem/1e6:.1f}M burnout_alive={alive}", flush=True)
-        # 达成条件：配额耗尽（<3M）且两个任务都已自行退出
+        # 达成条件 1：配额耗尽（<3M）且两个任务都已自行退出
+        # 达成条件 2：过了 09:00 配额重置线（用完"这一期"即可，不烧新一期）——宽限 20 分钟等当前轮收尾
+        deadline_hit = datetime.now() >= datetime.now().replace(hour=9, minute=20, second=0)
+        if deadline_hit and rem is not None and rem > 3e6:
+            print(f"[{now}] 已过 09:20 重置宽限线，触发收尾（不烧新一期配额）", flush=True)
+            break
         if rem is not None and rem < 3e6 and alive == 0:
             print("=== 配额用尽 + 任务退出 → 收尾 ===", flush=True)
             bak = backup_db()
